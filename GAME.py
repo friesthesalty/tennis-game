@@ -17,8 +17,8 @@ class Game:
 
         self.window = pygame.display.set_mode((self.window_height, self.window_width))
 
-        self.player1 = pygame.image.load('C:/Users/miche/Desktop/GAME/img/player1.png')
-        self.player2 = pygame.image.load('C:/Users/miche/Desktop/GAME/img/player2.png')
+        self.player1 = pygame.image.load('img/player1.png')
+        self.player2 = pygame.image.load('img/player2.png')
         self.movement1 = [False, False, False, False]  # Left, Right, Up, Down
         self.movement2 = [False, False, False, False]  # Left, Right, Up, Down
         self.p1_pos = [400, 400]
