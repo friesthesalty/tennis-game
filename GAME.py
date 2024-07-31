@@ -29,6 +29,56 @@ class Game:
         self.collision_cooldown_p2 = 1000  # 1 second cooldown for player 2
         self.last_collision_time_p1 = 0  # initialize last collision time for player 1
         self.last_collision_time_p2 = 0  # initialize last collision time for player 2
+
+        # Define colors
+        self.WHITE = (255, 255, 255)
+        self.BLACK = (0, 0, 0)
+
+        # Define fonts
+        self.font = pygame.font.SysFont(None, 36)
+
+        # Define overlay menu items
+        self.menu_items = ["Resume", "Options", "Quit"]
+        self.menu_item_rects = []
+
+        # Calculate the position of the menu items
+        for i, item in enumerate(self.menu_items):
+            text = self.font.render(item, True, self.WHITE)
+            rect = text.get_rect(center=(self.window_width // 2, self.window_height // 2 + i * 50))
+            self.menu_item_rects.append((text, rect))
+
+        # Overlay menu state
+        self.overlay_active = False
+
+    def menu(self):
+        running = True
+        while running:
+            eventList = pygame.event.get()
+            for event in eventList:
+                if event.type == pygame.QUIT:
+                    running = False
+                    break
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    for text, rect in self.menu_item_rects:
+                        if rect.collidepoint(event.pos):
+                            if self.font.render(self.menu_items[2], True, self.WHITE) == text:
+                                pygame.quit()
+                                exit()
+                            elif self.font.render(self.menu_items[0], True, self.WHITE) == text:
+                                self.overlay_active = False  # Resume the game
+                                return
+                            elif self.font.render(self.menu_items[1], True, self.WHITE) == text:
+                                print("Options")
+
+            # Draw the menu
+            self.window.fill(self.BLACK)
+            for text, rect in self.menu_item_rects:
+                self.window.blit(text, rect)
+
+            pygame.display.flip()
+            self.clock.tick(75)  # 75 FPS
+
+    
     def run(self):
 
 
@@ -56,9 +106,10 @@ class Game:
         
             eventList = pygame.event.get()
             for event in eventList:
-                if event.type == pygame.QUIT:
-                    running = False
-                    break
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+                        break
 
                 # Handle key presses for player 1
                 if event.type == pygame.KEYDOWN:
@@ -162,7 +213,7 @@ class Game:
                     if player1_rect.collidepoint(ball_obj.centerx, player1_rect.top):
                         normal = [0, -1]  # Top side
                     elif player1_rect.collidepoint(ball_obj.centerx, player1_rect.bottom):
-                        normal = [0, 1]  #
+                        normal = [0, 1]  # Bottom side
                     elif player1_rect.collidepoint(player1_rect.left, ball_obj.centery):
                         normal = [-1, 0]  # Left side
                     elif player1_rect.collidepoint(player1_rect.right, ball_obj.centery):
@@ -203,10 +254,21 @@ class Game:
             # draw ball at new centers that are obtained after moving ball_obj
             pygame.draw.circle(surface=self.window, color=(82, 235, 52), center=ball_obj.center, radius=7)
 
+            # Draw the overlay menu if active
+            if self.overlay_active:
+                overlay_surface = pygame.Surface((self.window_width, self.window_height))
+                overlay_surface.set_alpha(150)  # Set transparency
+                overlay_surface.fill(self.GRAY)  # Fill with gray
+                self.window.blit(overlay_surface, (0, 0))
+
+                for text, rect in self.menu_item_rects:
+                    self.window.blit(text, rect)
+
             # update screen
             pygame.display.flip()
             self.clock.tick(75) # 75 FPS
  
-        pygame.quit()
+        self.menu()
 
-Game().run() # run
+if __name__ == "__main__":
+    Game().run() # run
