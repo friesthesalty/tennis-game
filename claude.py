@@ -102,6 +102,9 @@ settings_button = Button("Settings", 300)
 quit_button = Button("Quit", 400)
 
 def menu():
+    global ball_speed_x
+    global ball_speed_y
+    global current_ball_img
     screen.fill(WHITE)
 
     # draw title
@@ -112,6 +115,15 @@ def menu():
     play_button.draw(screen)
     settings_button.draw(screen)
     quit_button.draw(screen)
+
+    # reset ball speeds for if u switch from believe to non believer
+    ball_speed_x = ball_speed_x_const if ball_speed_x > 0 else -ball_speed_x_const
+    ball_speed_y = ball_speed_y_const if ball_speed_y < 0 else -ball_speed_y_const
+
+    current_ball_img = ball_img # reset ball img to non-enhanced
+
+
+
 
 
 def game():
@@ -149,8 +161,12 @@ def game():
     ball_y += ball_speed_y
 
     # Ball collision with walls
-    if ball_x <= 0 or ball_x >= WIDTH - ball_width:
-        ball_speed_x = -ball_speed_x
+    if ball_x <= 0:
+        ball_speed_x = abs(ball_speed_x)
+    if ball_x >= WIDTH - ball_width:
+        ball_speed_x = -abs(ball_speed_x)
+    # ^ used to be just a sign switch but sometimes it would clip through the wall and would end up getting stuck
+
 
     # Ball collision with player/AI
     if ball_y <= ai_y + ai_height and ai_x < ball_x < ai_x + ai_width and ai_collision_delay == 0: # AI
@@ -202,7 +218,7 @@ def game():
     # Scoring
     if ball_y <= 0: # player scores
         player_score += 1
-        ball_x, ball_y = random.randint(70, 330), HEIGHT // 2 - ball_height // 2 + 100
+        ball_x, ball_y = 70, HEIGHT // 2 - ball_height // 2 + 100
         current_ball_img = ball_img
         if not belief:
             pygame.mixer.stop()
@@ -236,8 +252,8 @@ def game():
     pygame.draw.circle(screen, RED, (cursor_x, cursor_y), 5)
 
     # Draw score backgrounds
-    pygame.draw.rect(screen, WHITE, (5, HEIGHT - 45, 120 + (int(math.log10(player_score))) * 10 if player_score > 0 else 120, 40)) # Player score background; increases by 10 px for each digit
-    pygame.draw.rect(screen, WHITE, (5, 5, 70 + (int(math.log10(ai_score))) * 10 if ai_score > 0 else 70, 40)) # AI
+    pygame.draw.rect(screen, WHITE, (5, HEIGHT - 45, 120 + (int(math.log10(player_score))) * 13 if player_score > 0 else 120, 40)) # Player score background; increases by 10 px for each digit
+    pygame.draw.rect(screen, WHITE, (5, 5, 70 + (int(math.log10(ai_score))) * 13 if ai_score > 0 else 70, 40)) # AI
 
     # Draw score
     player_text = font.render(f"Player: {player_score}", True, BLACK)
