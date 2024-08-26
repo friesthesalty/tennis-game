@@ -1,6 +1,8 @@
 import pygame
 import random
 import os
+import math
+import time
 
 # Initialize Pygame
 pygame.init()
@@ -26,7 +28,7 @@ ball_img = pygame.image.load("img/ball.png")
 # Scale images
 player_img = pygame.transform.scale(player_img, (60, 60))
 ai_img = pygame.transform.scale(ai_img, (60, 60))
-ball_img = pygame.transform.scale(ball_img, (30, 30))
+ball_img = current_ball_img = pygame.transform.scale(ball_img, (30, 30))
 
 # Player attributes
 player_width, player_height = 60, 60
@@ -44,8 +46,8 @@ ai_speed = 3
 ball_width, ball_height = 30, 30
 ball_x = WIDTH // 2 - ball_width // 2
 ball_y = HEIGHT // 2 - ball_height // 2
-ball_speed_x = 4
-ball_speed_y = -4
+ball_speed_x = ball_speed_x_const = 5
+ball_speed_y = ball_speed_y_const = -5
 
 # Score
 player_score = 0
@@ -65,9 +67,14 @@ knob_radius = 15
 knob_x = 240 # starts at 3
 knob_y = slider_y + slider_height // 2
 
+player_collision_delay = 0
+ai_collision_delay = 0
+COLLISION_DELAY_TIME = 30  # Frames of delay (adjust as needed)
+
 
 
 dragging = False
+belief = False
 
 # Button class
 class Button:
@@ -116,9 +123,13 @@ def game():
     global ball_speed_y
     global player_score
     global ai_score
+    global player_collision_delay
+    global ai_collision_delay
+    global current_ball_img
     global WHITE
     global GREEN
     global BLUE
+
 
     # Move player
     keys = pygame.key.get_pressed()
@@ -141,23 +152,72 @@ def game():
     if ball_x <= 0 or ball_x >= WIDTH - ball_width:
         ball_speed_x = -ball_speed_x
 
-    # Ball collision with players
-    if ball_y <= ai_y + ai_height and ai_x < ball_x < ai_x + ai_width:
+    # Ball collision with player/AI
+    if ball_y <= ai_y + ai_height and ai_x < ball_x < ai_x + ai_width and ai_collision_delay == 0: # AI
         ball_speed_y = -ball_speed_y
-    elif ball_y + ball_height >= player_y and player_x < ball_x < player_x + player_width:
+        ai_collision_delay = COLLISION_DELAY_TIME
+        current_ball_img = ball_img
+        if belief:
+            ball_speed_x = ball_speed_x_const if ball_speed_x > 0 else -ball_speed_x_const
+            ball_speed_y = ball_speed_y_const if ball_speed_y < 0 else -ball_speed_y_const
+    elif ball_y + ball_height >= player_y and player_x < ball_x < player_x + player_width and player_collision_delay == 0: # PLAYER
         ball_speed_y = -ball_speed_y
+        player_collision_delay = COLLISION_DELAY_TIME
+        
+        if belief:
+            if rng(90):
+                play_sound("persona", vol=.3)
+                ball_speed_x = ai_speed + 1 if ball_speed_x > 0 else -ai_speed - 1
+                ball_speed_y = ai_speed * -2
+                current_ball_img = apply_color_overlay(ball_img, random.choice(vibrant_colors))  # RANDOM overlay
+            else:
+                play_sound()
+        
+        # Get cursor position
+        cursor_x, cursor_y = pygame.mouse.get_pos()
+        
+        # Calculate direction vector
+        dx = cursor_x - (ball_x + ball_width // 2)
+        dy = cursor_y - (ball_y + ball_height // 2)
+        
+        # Normalize the direction vector
+        length = math.sqrt(dx**2 + dy**2)
+        if length != 0:
+            dx /= length
+            dy /= length
+        
+        # Set new ball speed
+        speed = math.sqrt(ball_speed_x**2 + ball_speed_y**2)
+        ball_speed_x = dx * speed
+        ball_speed_y = -abs(dy * speed)  # Ensure the ball always goes up
+    
+    # Decrease collision delays
+    if player_collision_delay > 0:
+        player_collision_delay -= 1
+    if ai_collision_delay > 0:
+        ai_collision_delay -= 1
+    
+
 
     # Scoring
     if ball_y <= 0: # player scores
         player_score += 1
-        ball_x, ball_y = WIDTH // 2 - ball_width // 2, HEIGHT // 2 - ball_height // 2 + 100
-        pygame.mixer.stop()
+        ball_x, ball_y = random.randint(70, 330), HEIGHT // 2 - ball_height // 2 + 100
+        current_ball_img = ball_img
+        if not belief:
+            pygame.mixer.stop()
         play_sound("goal")
+        if belief:
+            ball_speed_x = ball_speed_x_const if ball_speed_x > 0 else -ball_speed_x_const
+            ball_speed_y = ball_speed_y_const if ball_speed_y < 0 else -ball_speed_y_const
     elif ball_y >= HEIGHT: # ai scores
         ai_score += 1
-        ball_x, ball_y = WIDTH // 2 - ball_width // 2, HEIGHT // 2 - ball_height // 2 - 100
-        pygame.mixer.stop()
+        ball_x, ball_y = ai_x, HEIGHT // 2 - ball_height // 2 - 100
+        if not belief:
+            pygame.mixer.stop()
         play_sound()
+
+
 
     # Draw background
     screen.fill(GREEN)
@@ -169,11 +229,15 @@ def game():
     # Draw players and ball
     screen.blit(player_img, (player_x, player_y))
     screen.blit(ai_img, (ai_x, ai_y))
-    screen.blit(ball_img, (ball_x, ball_y))
+    screen.blit(current_ball_img, (ball_x, ball_y))
+
+    # Draw cursor position indicator
+    cursor_x, cursor_y = pygame.mouse.get_pos()
+    pygame.draw.circle(screen, RED, (cursor_x, cursor_y), 5)
 
     # Draw score backgrounds
-    pygame.draw.rect(screen, WHITE, (5, HEIGHT - 45, 120, 40))
-    pygame.draw.rect(screen, WHITE, (5, 5, 70, 40))
+    pygame.draw.rect(screen, WHITE, (5, HEIGHT - 45, 120 + (int(math.log10(player_score))) * 10 if player_score > 0 else 120, 40)) # Player score background; increases by 10 px for each digit
+    pygame.draw.rect(screen, WHITE, (5, 5, 70 + (int(math.log10(ai_score))) * 10 if ai_score > 0 else 70, 40)) # AI
 
     # Draw score
     player_text = font.render(f"Player: {player_score}", True, BLACK)
@@ -198,15 +262,39 @@ def settings():
     
     # Display value
     font = pygame.font.Font(None, 36)
-    text = font.render(f"Value: {ai_speed}", True, BLACK)
+    text = font.render(f"Value: {ai_speed}", True, BLACK if ai_speed < ball_speed_x_const else RED)
     screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 + 50))
 
 
-def play_sound(dir="sfx"):
-    sound = pygame.mixer.Sound(dir + "/" + random.choice(os.listdir(dir)))
+def play_sound(dir="sfx", vol=1):
+    sound = pygame.mixer.Sound(dir + "/" + random.choice(os.listdir(dir))) # random file from folder
+    sound.set_volume(vol)
     if dir == "sfx" or sound.get_length() == 2:
         sound.set_volume(.3)
     sound.play()
+
+def rng(n):
+    x = random.randint(0, 100)
+    if x <= n:
+        return 1
+    return 0
+
+def apply_color_overlay(surface, color, alpha=128):
+    overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+    overlay.fill(color + (alpha,))
+    new_surface = surface.copy()
+    new_surface.blit(overlay, (0,0), special_flags=pygame.BLEND_ADD)
+    return new_surface
+
+vibrant_colors = [
+    (255, 0, 0), (255, 128, 0), (255, 255, 0), (128, 255, 0), (0, 255, 0), (0, 255, 128), (0, 255, 255), (0, 128, 255), (0, 0, 255), (128, 0, 255), (255, 0, 255), (255, 0, 128)
+    ]
+
+
+
+
+
+ball_img_fast = apply_color_overlay(ball_img, random.choice(vibrant_colors))  # RANDOM overlay
 
 # Game loop
 clock = pygame.time.Clock()
@@ -220,11 +308,14 @@ dance.set_volume(.3)
 v = pygame.mixer.Sound("sfx/vanadis.wav")
 v.set_volume(.3)
 
+# i believe
+believe = pygame.mixer.Sound("sfx/believe.wav")
+
 
 # main
 while running:
     for event in pygame.event.get():
-        if event.type == pygame.QUIT or quit_button.is_clicked(event):
+        if event.type == pygame.QUIT or quit_button.is_clicked(event) and cur == "menu":
             running = False
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE and cur != "menu":
@@ -236,6 +327,8 @@ while running:
             cur = "game"
             pygame.mixer.stop()
             dance.play()
+            if belief:
+                believe.play(loops=-1)
         if settings_button.is_clicked(event) and cur == "menu":
             print("Settings clicked")
             cur = "settings"
@@ -257,7 +350,8 @@ while running:
             if event.type == pygame.MOUSEMOTION and dragging:
                 mouse_x, _ = event.pos
                 knob_x = max(slider_x, min(mouse_x, slider_x + slider_width))
-                ai_speed = int((knob_x - slider_x) / slider_width * 5) + 1
+                ai_speed = int((knob_x - slider_x) / slider_width * 6) + 1
+                belief = True if ai_speed >= ball_speed_x_const else False
 
     if cur == "game":            
         game()
@@ -272,7 +366,7 @@ while running:
     # Update display
     pygame.display.flip()
 
-    # Cap the frame rate
+    # frame rate
     clock.tick(75)
 
 
